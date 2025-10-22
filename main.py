@@ -14,7 +14,7 @@ import os
 import json
 import streamlit as st
 
-# Config: Global Hustle with Affiliate Beast
+# Config: Slickofficials HQ by Amson Multi Global LTD
 SYMBOLS = ['HEX/USDT', 'ETH/USDT', 'SOL/USDT']
 EXCHANGES = ['binance', 'mexc', 'bitget']
 POLYGON_RPC = 'https://polygon-rpc.com'
@@ -236,7 +236,7 @@ def update_dashboard(balances, prices, affiliate_earnings=0, trade_counts={}, pr
             sheet.append_row([str(pd.Timestamp.now()), symbol, balances[symbol][0], balances[symbol][1], affiliate_earnings, total, trade_counts.get(symbol, 0), drawdown, forecast])
         requests.post(os.getenv('ZAPIER_WEBHOOK'), json={
             'number': os.getenv('WHATSAPP_NUMBER'),
-            'message': f"OmniPredator V4: ${total:.2f} | Trades {sum(trade_counts.values())} | Forecast ${forecast:.2f}"
+            'message': f"Slickofficials HQ by Amson Multi Global LTD: ${total:.2f} | Trades {sum(trade_counts.values())} | Forecast ${forecast:.2f}"
         })
         return total, trade_counts, forecast, affiliate_earnings, drawdown
     except Exception as e:
@@ -258,11 +258,11 @@ def backtest():
     return True
 
 def streamlit_dashboard():
-    st.set_page_config(page_title="OmniPredator V4 Dashboard", layout="wide")
+    st.set_page_config(page_title="Slickofficials HQ by Amson Multi Global LTD Dashboard", layout="wide")
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
     if not st.session_state.logged_in:
-        st.title("OmniPredator V4: Login")
+        st.title("Slickofficials HQ by Amson Multi Global LTD: Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         if st.button("Login"):
@@ -272,7 +272,7 @@ def streamlit_dashboard():
             else:
                 st.error("Invalid credentials")
         return
-    st.title("OmniPredator V4: Global Hustle Dashboard")
+    st.title("Slickofficials HQ by Amson Multi Global LTD: OmniPredator V4 Dashboard")
     balances = {s: [22/len(SYMBOLS), 0] for s in SYMBOLS}
     prices = {s: fetch_prices(s) for s in SYMBOLS}
     total, trade_counts, forecast, affiliate_earnings, drawdown = update_dashboard(balances, prices, trade_counts={s: 0 for s in SYMBOLS}, profits={s: [] for s in SYMBOLS})

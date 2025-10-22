@@ -1,0 +1,11 @@
+ccxt
+pandas
+numpy
+scikit-learn
+web3
+requests
+gspread
+oauth2client
+vaderSentiment
+streamlit
+statsmodels

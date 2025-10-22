@@ -14,14 +14,14 @@ import os
 import json
 import streamlit as st
 
-# Config: Slickofficials HQ by Amson Multi Global LTD
+# Config: OmniPredatorV4-AffiliateApex by Slickofficials HQ | Amson Multi Global LTD
 SYMBOLS = ['HEX/USDT', 'ETH/USDT', 'SOL/USDT']
 EXCHANGES = ['binance', 'mexc', 'bitget']
 POLYGON_RPC = 'https://polygon-rpc.com'
 ETHEREUM_RPC = 'https://mainnet.infura.io/v3/' + os.getenv('INFURA_KEY')
 PENDLE_CONTRACT = '0x808507121b80c02388fad14726482e061b8da827'
 AAVE_CONTRACT = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
-POSITION_SIZE = 1.5  # $22 split
+POSITION_SIZE = 1.5  # $22 split across symbols
 VOL_MULTIPLIER = 0.3
 SARSA_LEARNING_RATE = 0.15
 SARSA_DISCOUNT = 0.95
@@ -46,7 +46,7 @@ DEEP_LINKS = {
     'Shenzhen Wondershare Software Co., Ltd': 'https://click.linksynergy.com/deeplink?id=iejQuC2lIug&mid=37160&murl=https%3A%2F%2Fwww.wondershare.com%2F'
 }
 
-# Init
+# Initialize
 exchanges = {
     'binance': ccxt.binance({'apiKey': os.getenv('BINANCE_KEY'), 'secret': os.getenv('BINANCE_SECRET'), 'enableRateLimit': True, 'sandbox': os.getenv('SANDBOX', 'True') == 'True'}),
     'mexc': ccxt.mexc({'apiKey': os.getenv('MEXC_KEY'), 'secret': os.getenv('MEXC_SECRET'), 'enableRateLimit': True, 'sandbox': os.getenv('SANDBOX', 'True') == 'True'}),
@@ -124,7 +124,8 @@ def choose_action(symbol, volatility, sentiment):
 
 def arbitrage(symbol, balance_usdt=22/len(SYMBOLS), balance_asset=0, avg_buy=0, trade_count=0, profits=[]):
     prices = fetch_prices(symbol)
-    if any(np.isnan(list(prices.values()))): return balance_usdt, balance_asset, avg_buy, trade_count, profits
+    if any(np.isnan(list(prices.values()))): 
+        return balance_usdt, balance_asset, avg_buy, trade_count, profits
     volatility, _ = calculate_volatility(symbol)
     sentiment = fetch_sentiment(symbol)
     pred, conf = predict_edge(symbol)
@@ -160,7 +161,8 @@ def arbitrage(symbol, balance_usdt=22/len(SYMBOLS), balance_asset=0, avg_buy=0, 
     return balance_usdt, balance_asset, avg_buy, trade_count, profits
 
 def auto_defi(balance_excess):
-    if balance_excess < 1: return
+    if balance_excess < 1: 
+        return
     try:
         nonce = w3_polygon.eth.get_transaction_count(account.address)
         tx_pendle = pendle_contract.functions.deposit(int(0.5 * 1e6)).build_transaction({
@@ -184,7 +186,7 @@ def fetch_deep_links(network):
         if network == 'awin':
             url = f"https://api.awin.com/advertisers/{os.getenv('AWIN_ADVERTISER_ID')}/links?apiKey={AFFILIATE_API_KEYS['awin']}"
             data = requests.get(url).json()
-            return [link['url'] for link in data if 'deep' in link['type']]
+            return [link['url'] for link in data if 'deep' in link['type'].lower()]
         elif network == 'rakuten':
             url = f"https://api.linksynergy.com/linklocator/1.0/getlinks?token={AFFILIATE_API_KEYS['rakuten']}"
             data = requests.get(url).json()
@@ -236,7 +238,7 @@ def update_dashboard(balances, prices, affiliate_earnings=0, trade_counts={}, pr
             sheet.append_row([str(pd.Timestamp.now()), symbol, balances[symbol][0], balances[symbol][1], affiliate_earnings, total, trade_counts.get(symbol, 0), drawdown, forecast])
         requests.post(os.getenv('ZAPIER_WEBHOOK'), json={
             'number': os.getenv('WHATSAPP_NUMBER'),
-            'message': f"Slickofficials HQ by Amson Multi Global LTD: ${total:.2f} | Trades {sum(trade_counts.values())} | Forecast ${forecast:.2f}"
+            'message': f"OmniPredatorV4-AffiliateApex by Slickofficials HQ | Amson Multi Global LTD: ${total:.2f} | Trades {sum(trade_counts.values())} | Forecast ${forecast:.2f}"
         })
         return total, trade_counts, forecast, affiliate_earnings, drawdown
     except Exception as e:
@@ -252,17 +254,18 @@ def backtest():
             prices['binance'] = prices['close'] * np.random.uniform(0.995, 1.005, len(prices))
             prices['mexc'] = prices['close'] * np.random.uniform(0.99, 1.01, len(prices))
             trades = prices[(prices['binance'] - prices['mexc']) / prices['mexc'] > 0.008]
-            if len(trades) <= 10: return False
+            if len(trades) <= 10: 
+                return False
         except:
             return False
     return True
 
 def streamlit_dashboard():
-    st.set_page_config(page_title="Slickofficials HQ by Amson Multi Global LTD Dashboard", layout="wide")
+    st.set_page_config(page_title="OmniPredatorV4-AffiliateApex Dashboard", layout="wide")
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
     if not st.session_state.logged_in:
-        st.title("Slickofficials HQ by Amson Multi Global LTD: Login")
+        st.title("OmniPredatorV4-AffiliateApex by Slickofficials HQ | Amson Multi Global LTD: Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         if st.button("Login"):
@@ -271,8 +274,9 @@ def streamlit_dashboard():
                 st.experimental_rerun()
             else:
                 st.error("Invalid credentials")
+        st.markdown("<p style='text-align: center; color: grey;'>© 2025 Slickofficials HQ by Amson Multi Global LTD</p>", unsafe_allow_html=True)
         return
-    st.title("Slickofficials HQ by Amson Multi Global LTD: OmniPredator V4 Dashboard")
+    st.title("OmniPredatorV4-AffiliateApex by Slickofficials HQ | Amson Multi Global LTD")
     balances = {s: [22/len(SYMBOLS), 0] for s in SYMBOLS}
     prices = {s: fetch_prices(s) for s in SYMBOLS}
     total, trade_counts, forecast, affiliate_earnings, drawdown = update_dashboard(balances, prices, trade_counts={s: 0 for s in SYMBOLS}, profits={s: [] for s in SYMBOLS})
@@ -316,6 +320,7 @@ def streamlit_dashboard():
     st.subheader("Affiliate Links")
     for name, link in DEEP_LINKS.items():
         st.write(f"{name}: {link}")
+    st.markdown("<p style='text-align: center; color: grey;'>© 2025 Slickofficials HQ by Amson Multi Global LTD</p>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     if backtest():
@@ -345,14 +350,14 @@ if __name__ == "__main__":
                     new_links = []
                     for network in AFFILIATE_NETWORKS:
                         new_links += fetch_deep_links(network)
-                        apply_for_promotion(network, 'random_id')  # Replace with real advertiser ID logic
+                        apply_for_promotion(network, 'random_id')  # Replace with real advertiser ID
                     suggestion, details = suggest_new_platforms()
                     DEEP_LINKS.update({suggestion: 'auto_link'})  # Placeholder
                     print(f"Suggested: {suggestion} - {details}")
                     last_affiliate = time.time()
                 time.sleep(3600)
             except Exception as e:
-                print(f"OmniPredator V4 Error: {e} – Retrying...")
+                print(f"OmniPredatorV4-AffiliateApex Error: {e} - Retrying...")
                 time.sleep(60)
     else:
-        print("Backtest failed – Check setup")
+        print("Backtest failed - Check setup")

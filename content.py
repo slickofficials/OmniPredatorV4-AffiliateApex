@@ -1,19 +1,9 @@
 import requests
-import time
 import os
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import numpy as np
-import random
+import time
 
-# Config
-IFTTT_KEY = os.getenv('IFTTT_KEY')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-CHAT_ID = '@SlickofficialsHQ'
-IFTTT_X_EVENT = os.getenv('IFTTT_X_EVENT')
-IFTTT_TIKTOK_EVENT = os.getenv('IFTTT_TIKTOK_EVENT')
-IFTTT_IG_EVENT = os.getenv('IFTTT_IG_EVENT')
-analyzer = SentimentIntensityAnalyzer()
-
+# Config: OmniPredatorV4-AffiliateApex by Slickofficials HQ | Amson Multi Global LTD
 DEEP_LINKS = {
     'Kila Custom Insoles': 'https://tidd.ly/3J1KeV2',
     'Kapitalwise': 'https://tidd.ly/43ibfu7',
@@ -27,41 +17,42 @@ DEEP_LINKS = {
     'Bonne et Filou': 'https://tidd.ly/4hgNp7H',
     'Shenzhen Wondershare Software Co., Ltd': 'https://click.linksynergy.com/deeplink?id=iejQuC2lIug&mid=37160&murl=https%3A%2F%2Fwww.wondershare.com%2F'
 }
+POST_TEMPLATES = [
+    "🚀 {product} is a game-changer! Grab it now: {link} #SlickofficialsHQ #Hustle",
+    "💪 Level up with {product}! Shop here: {link} #AmsonMultiGlobal #AffiliateApex",
+    "🔥 Don’t miss {product}! Click: {link} #SlickofficialsHQ #OmniPredatorV4",
+    "🌟 {product} for the win! Get yours: {link} #HealthAndWealth #SlickofficialsHQ",
+    "💸 {product} is calling! Shop now: {link} #AmsonMultiGlobal #CryptoHustle"
+]
+PLATFORMS = ['x', 'facebook', 'tiktok', 'instagram']
+POST_FREQUENCY = 3600  # 1 hour
 
-def fetch_sentiment():
+def post_to_platform(platform, message):
     try:
-        url = f"https://api.twitter.com/2/tweets/search/recent?query=crypto%20global&bearer_token={os.getenv('X_BEARER_TOKEN')}"
-        headers = {'Authorization': f"Bearer {os.getenv('X_BEARER_TOKEN')}"}
-        data = requests.get(url, headers=headers).json()
-        scores = [analyzer.polarity_scores(tweet['text'])['compound'] for tweet in data.get('data', [])]
-        return np.mean(scores) if scores else 0
-    except:
-        return 0
-
-def post_update(profit, trades, affiliate, defi_apr):
-    sentiment = fetch_sentiment()
-    link_name, link = random.choice(list(DEEP_LINKS.items()))
-    if sentiment > 0.5:
-        text = f"🌍 OmniPredator V4: ${profit:.2f} from {trades} trades + {defi_apr}% DeFi! Grab {link_name}: {link} #SlickofficialsHQ"
-    else:
-        text = f"💪 Predator Global: ${profit:.2f} from {trades} + {defi_apr}% DeFi. Join with {link_name}: {link} #GlobalPredator"
-    try:
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", data={'chat_id': CHAT_ID, 'text': text})
-        requests.post(f"https://maker.ifttt.com/trigger/{IFTTT_X_EVENT}/with/key/{IFTTT_KEY}", json={'value1': text})
-        requests.post(f"https://maker.ifttt.com/trigger/{IFTTT_TIKTOK_EVENT}/with/key/{IFTTT_KEY}", json={'value1': text, 'value2': 'YOUR_TIKTOK_VIDEO_URL'})
-        requests.post(f"https://maker.ifttt.com/trigger/{IFTTT_IG_EVENT}/with/key/{IFTTT_KEY}", json={'value1': text})
-        print(f"Posted: {text[:50]}...")
+        ifttt_key = os.getenv('IFTTT_KEY')
+        event = os.getenv(f'IFTTT_{platform.upper()}_EVENT')
+        url = f"https://maker.ifttt.com/trigger/{event}/with/key/{ifttt_key}"
+        payload = {'value1': message}
+        response = requests.post(url, json=payload)
+        print(f"Posted to {platform}: {message} | Status: {response.status_code}")
+        return response.status_code == 200
     except Exception as e:
-        print(f"Post Error: {e}")
+        print(f"Error posting to {platform}: {e}")
+        return False
 
-while True:
-    try:
-        profit = 25.0  # Auto-pulled from bot
-        trades = 150
-        affiliate = 250.0
-        defi_apr = 35
-        post_update(profit, trades, affiliate, defi_apr)
-        time.sleep(86400)
-    except Exception as e:
-        print(f"Virality Error: {e}")
-        time.sleep(3600)
+def main():
+    while True:
+        try:
+            for _ in range(np.random.randint(1, 3)):  # 1-2 posts/hour
+                product, link = np.random.choice(list(DEEP_LINKS.items()))
+                template = np.random.choice(POST_TEMPLATES)
+                message = template.format(product=product, link=link)
+                for platform in PLATFORMS:
+                    post_to_platform(platform, message)
+            time.sleep(POST_FREQUENCY)
+        except Exception as e:
+            print(f"Content Error: {e} - Retrying...")
+            time.sleep(60)
+
+if __name__ == "__main__":
+    main()

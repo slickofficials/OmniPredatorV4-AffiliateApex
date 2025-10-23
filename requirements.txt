@@ -9,4 +9,4 @@ oauth2client
 vaderSentiment
 streamlit
 statsmodels
-tweepy  # Add this if missing
+tweepy

@@ -10,3 +10,4 @@ vaderSentiment
 streamlit
 statsmodels
 tweepy
+google-api-python-client  # Add this for googleapiclient

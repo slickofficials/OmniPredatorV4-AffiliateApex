@@ -24,8 +24,8 @@ if os.getenv('SANDBOX', 'True') == 'True':
             print(f"[!] Sandbox not supported: {ex.id}")
 
 # Web3
-infura_url = f"https://mainnet.infura.io/v3/{os.getenv('INFURA_KEY')}"
-w3 = Web3(Web3.HTTPProvider(infra_url))
+infura_url = f"https://mainnet.infura.io/v3/{os.getenv('INFURA_KEY')}"  # Correct variable name
+w3 = Web3(Web3.HTTPProvider(infura_url))  # Fixed to infura_url
 wallet = w3.eth.account.from_key(os.getenv('WALLET_PRIVATE_KEY'))
 wallet_address = wallet.address
 

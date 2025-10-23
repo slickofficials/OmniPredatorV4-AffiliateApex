@@ -9,69 +9,41 @@ import tweepy
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from web3 import Web3
-import streamlit as st
 
-# === CONFIGURATION ===
-if 'streamlit' in os.sys.modules:
-    # Streamlit mode
-    pass
-else:
-    # Main bot mode
-    # Load Exchanges
-    exchanges = {
-        'bybit': ccxt.bybit({
-            'apiKey': os.getenv('BYBIT_KEY'),
-            'secret': os.getenv('BYBIT_SECRET'),
-            'enableRateLimit': True
-        }),
-        'mexc': ccxt.mexc({
-            'apiKey': os.getenv('MEXC_KEY'),
-            'secret': os.getenv('MEXC_SECRET'),
-            'enableRateLimit': True
-        }),
-        'bitget': ccxt.bitget({
-            'apiKey': os.getenv('BITGET_KEY'),
-            'secret': os.getenv('BITGET_SECRET'),
-            'enableRateLimit': True
-        })
-    }
+# Exchanges
+exchanges = {
+    'bybit': ccxt.bybit({'apiKey': os.getenv('BYBIT_KEY'), 'secret': os.getenv('BYBIT_SECRET'), 'enableRateLimit': True}),
+    'mexc': ccxt.mexc({'apiKey': os.getenv('MEXC_KEY'), 'secret': os.getenv('MEXC_SECRET'), 'enableRateLimit': True}),
+    'bitget': ccxt.bitget({'apiKey': os.getenv('BITGET_KEY'), 'secret': os.getenv('BITGET_SECRET'), 'enableRateLimit': True})
+}
+if os.getenv('SANDBOX', 'True') == 'True':
+    for ex in exchanges.values():
+        try:
+            ex.set_sandbox_mode(True)
+        except Exception as e:
+            print(f"[!] Sandbox not supported: {ex.id}")
 
-    # Sandbox Mode Toggle
-    if os.getenv('SANDBOX', 'True') == 'True':
-        for ex in exchanges.values():
-            try:
-                ex.set_sandbox_mode(True)
-            except Exception as e:
-                print(f"[!] Sandbox not supported: {ex.id}")
+# Web3
+infura_url = f"https://mainnet.infura.io/v3/{os.getenv('INFURA_KEY')}"
+w3 = Web3(Web3.HTTPProvider(infra_url))
+wallet = w3.eth.account.from_key(os.getenv('WALLET_PRIVATE_KEY'))
+wallet_address = wallet.address
 
-    # Wallet + Web3
-    infura_url = f"https://mainnet.infura.io/v3/{os.getenv('INFURA_KEY')}"
-    w3 = Web3(Web3.HTTPProvider(infra_url))
-    wallet = w3.eth.account.from_key(os.getenv('WALLET_PRIVATE_KEY'))
-    wallet_address = wallet.address
+# Google Sheets
+creds = Credentials.from_service_account_info(json.loads(os.getenv('CREDENTIALS_JSON')))
+sheets_service = build('sheets', 'v4', credentials=creds)
+sheet_id = os.getenv('SHEET_ID')
 
-    # Google Sheets
-    creds = Credentials.from_service_account_info(json.loads(os.getenv('CREDENTIALS_JSON')))
-    sheets_service = build('sheets', 'v4', credentials=creds)
-    sheet_id = os.getenv('SHEET_ID')
+# X/Twitter Setup
+auth = tweepy.OAuth1UserHandler(
+    os.getenv('X_CONSUMER_KEY'),
+    os.getenv('X_CONSUMER_SECRET'),
+    os.getenv('X_ACCESS_TOKEN'),
+    os.getenv('X_ACCESS_TOKEN_SECRET')
+)
+x_api = tweepy.API(auth)
+x_client = tweepy.Client(bearer_token=os.getenv('X_BEARER_TOKEN'))
 
-    # X/Twitter API v2 Setup
-    auth = tweepy.OAuth1UserHandler(
-        os.getenv('X_CONSUMER_KEY'),
-        os.getenv('X_CONSUMER_SECRET'),
-        os.getenv('X_ACCESS_TOKEN'),
-        os.getenv('X_ACCESS_TOKEN_SECRET')
-    )
-    api = tweepy.API(auth)
-    client = tweepy.Client(
-        bearer_token=os.getenv('X_BEARER_TOKEN'),
-        consumer_key=os.getenv('X_CONSUMER_KEY'),
-        consumer_secret=os.getenv('X_CONSUMER_SECRET'),
-        access_token=os.getenv('X_ACCESS_TOKEN'),
-        access_token_secret=os.getenv('X_ACCESS_TOKEN_SECRET')
-    )
-
-# === CORE FUNCTIONS ===
 def fetch_deep_links(network):
     try:
         if network == 'awin':
@@ -81,11 +53,7 @@ def fetch_deep_links(network):
             return [link['url'] for link in data if 'deep' in link.get('type', '')]
         elif network == 'rakuten':
             url = f"https://api.linksynergy.com/linklocator/1.0/getlinks"
-            params = {
-                "token": os.getenv('RAKUTEN_WEBSERVICE_TOKEN'),
-                "scope": os.getenv('RAKUTEN_SCOPE_ID'),
-                "security": os.getenv('RAKUTEN_SECURITY_TOKEN')
-            }
+            params = {"token": os.getenv('RAKUTEN_WEBSERVICE_TOKEN'), "scope": os.getenv('RAKUTEN_SCOPE_ID'), "security": os.getenv('RAKUTEN_SECURITY_TOKEN')}
             data = requests.get(url, params=params).json()
             return [link['link'] for link in data.get('links', [])]
     except Exception as e:
@@ -119,128 +87,64 @@ def execute_defi():
 
 def log_to_sheets(data):
     try:
-        sheets_service.spreadsheets().values().append(
-            spreadsheetId=sheet_id,
-            range="A:A",
-            valueInputOption="RAW",
-            body={"values": [[data]]}
-        ).execute()
+        sheets_service.spreadsheets().values().append(spreadsheetId=sheet_id, range="A:A", valueInputOption="RAW", body={"values": [[data]]}).execute()
         print(f"[Sheets] Logged: {data}")
     except Exception:
-        print(traceback.format_exc())
+        print(f"[Sheets Error] {traceback.format_exc()}")
 
-def send_whatsapp_alert(message):
+def send_to_zapier(data):
     try:
         zapier_webhook = os.getenv('ZAPIER_WEBHOOK')
-        payload = {'value1': message}
+        payload = {'message': data}
         res = requests.post(zapier_webhook, json=payload)
-        if res.status_code != 200:
-            print(f"[WhatsApp] Error | Status: {res.status_code} | Response: {res.text}")
+        if res.status_code == 200:
+            print(f"[Zapier] Sent: {data}")
         else:
-            print(f"[WhatsApp] Sent | Status: {res.status_code}")
+            print(f"[Zapier Error] Status: {res.status_code}")
     except Exception as e:
-        print(f"[WhatsApp Error] {e}")
+        print(f"[Zapier Error] {e}")
 
 def post_to_x(message):
     try:
-        api.update_status(message[:280])  # X limit 280 chars
+        x_api.update_status(message[:280])
         print(f"[X/Twitter] Posted: {message}")
     except Exception as e:
         print(f"[X Error] {e}")
 
-def post_to_telegram(message):
-    try:
-        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
-        chat_id = os.getenv('TELEGRAM_CHAT_ID')
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        payload = {"chat_id": chat_id, "text": message[:4096]}  # Telegram limit 4096 chars
-        res = requests.post(url, json=payload)
-        if res.status_code != 200:
-            print(f"[Telegram] Error | Status: {res.status_code} | Response: {res.text}")
-        else:
-            print(f"[Telegram] Sent | Status: {res.status_code}")
-    except Exception as e:
-        print(f"[Telegram Error] {e}")
-
 def auto_post_affiliate_links():
     try:
-        # Fetch AWIN deep links
         awin_links = fetch_deep_links('awin')
-        # Fetch Rakuten deep links
         rakuten_links = fetch_deep_links('rakuten')
-
         all_links = awin_links + rakuten_links
-
         if not all_links:
             print("No affiliate links found this cycle.")
             return
-
-        # Choose a few to post each cycle (randomized)
         links_to_post = random.sample(all_links, min(3, len(all_links)))
-
         for link in links_to_post:
-            message = f"🔥 Check out our latest affiliate deal! {link} 💰 #Affiliate #Deals #Crypto #AI"
-
-            # Post to X (Twitter)
-            post_to_x(message)
-
-            # Post to Telegram
-            post_to_telegram(message)
-
-            # Send WhatsApp alert (Zapier)
-            send_whatsapp_alert(message)
-
-            # Log link to Google Sheets
+            message = f"🔥 Latest deal! {link} 💰 #SlickofficialsHQ"
+            send_to_zapier(message)  # Posts to FB, IG, Telegram, WhatsApp, TikTok via Zapier
+            post_to_x(message)  # Direct X posting
             log_to_sheets(f"Affiliate Posted: {link}")
-
             print(f"[Affiliate] Posted link: {link}")
-
     except Exception as e:
         print(f"[Affiliate AutoPost Error] {e}")
 
-# === DASHBOARD MODE ===
-if 'streamlit' in os.sys.modules:
-    st.title("OmniPredatorV4 Dashboard © 2025 Slickofficials HQ by Amson Multi Global LTD")
-    st.write("Resale rights included. Contact: slickofficials@amsonmultiglobal.com")
+def main():
+    while True:
+        try:
+            total_balance = sum(ex.fetch_balance()['total'].get('USDT', 0) for ex in exchanges.values())
+            trades = sum(len(ex.fetch_open_orders()) for ex in exchanges.values())
+            forecast = total_balance * 0.1
+            data = f"${total_balance:.2f} | Trades: {trades} | Forecast: ${forecast:.2f}"
+            log_to_sheets(data)
+            send_to_zapier(f"OmniPredatorV4-AffiliateApex | Amson Multi Global LTD: {data}")
+            execute_arbitrage()
+            execute_defi()
+            auto_post_affiliate_links()
+            time.sleep(3600)
+        except Exception:
+            print(traceback.format_exc())
+            time.sleep(60)
 
-    # Fetch data from Sheets
-    creds = Credentials.from_service_account_info(eval(os.getenv('CREDENTIALS_JSON')))
-    sheets_service = build('sheets', 'v4', credentials=creds)
-    sheet_id = os.getenv('SHEET_ID')
-    sheet = sheets_service.spreadsheets().values().get(spreadsheetId=sheet_id, range="A:A").execute()
-    data = sheet.get('values', [])
-
-    if data:
-        st.write("### Recent Logs")
-        for row in data[-10:]:  # Last 10 entries
-            st.write(row[0])
-    else:
-        st.write("No data yet.")
-
-    if st.button("Refresh"):
-        st.experimental_rerun()
-
-# === MAIN LOOP ===
-if 'streamlit' not in os.sys.modules:
-    def main():
-        while True:
-            try:
-                total_balance = sum(ex.fetch_balance()['total'].get('USDT', 0) for ex in exchanges.values())
-                trades = sum(len(ex.fetch_open_orders()) for ex in exchanges.values())
-                forecast = total_balance * 0.1
-                data = f"${total_balance:.2f} | Trades: {trades} | Forecast: ${forecast:.2f}"
-                
-                log_to_sheets(data)
-                send_whatsapp_alert(f"OmniPredatorV4-AffiliateApex | Amson Multi Global LTD: {data}")
-                execute_arbitrage()
-                execute_defi()
-                post_to_x(f"🚀 OmniPredatorV4 Daily Report:\n{data}\n#Crypto #DeFi #Automation #AI")
-                post_to_telegram(f"📊 OmniPredatorV4 Update:\n{data}")
-                auto_post_affiliate_links()
-                time.sleep(3600)  # 1-hour cycle
-            except Exception:
-                print(traceback.format_exc())
-                time.sleep(60)
-
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()

@@ -12,3 +12,4 @@ statsmodels
 tweepy
 google-api-python-client
 python-dotenv
+plotly  # Add this line

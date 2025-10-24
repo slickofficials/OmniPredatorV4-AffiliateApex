@@ -11,11 +11,6 @@ from googleapiclient.discovery import build
 from web3 import Web3
 import streamlit as st
 from dotenv import load_dotenv
-from datetime import datetime
-import plotly.express as px
-import plotly.graph_objects as go
-import pandas as pd
-import numpy as np
 
 load_dotenv()
 
@@ -58,7 +53,7 @@ else:
     wallet = w3.eth.account.from_key(os.getenv('WALLET_PRIVATE_KEY'))
     wallet_address = wallet.address
 
-    # Google Sheets
+    # Google Sheets - FIXED: Use json.loads() instead of eval()
     creds = Credentials.from_service_account_info(json.loads(os.getenv('CREDENTIALS_JSON')))
     sheets_service = build('sheets', 'v4', credentials=creds)
     sheet_id = os.getenv('SHEET_ID')
@@ -193,7 +188,7 @@ if 'streamlit' in os.sys.modules:
     st.title("OmniPredatorV4 Dashboard © 2025 Slickofficials HQ by Amson Multi Global LTD")
     st.write("Resale rights included. Contact: slickofficials@amsonmultiglobal.com")
 
-    creds = Credentials.from_service_account_info(eval(os.getenv('CREDENTIALS_JSON')))
+    creds = Credentials.from_service_account_info(json.loads(os.getenv('CREDENTIALS_JSON')))  # FIXED: json.loads()
     sheets_service = build('sheets', 'v4', credentials=creds)
     sheet_id = os.getenv('SHEET_ID')
 

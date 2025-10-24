@@ -11,4 +11,4 @@ streamlit
 statsmodels
 tweepy
 google-api-python-client
-python-dotenv  # Add this line
+python-dotenv

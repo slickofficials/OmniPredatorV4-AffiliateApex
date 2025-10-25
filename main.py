@@ -53,25 +53,26 @@ else:
     wallet = w3.eth.account.from_key(os.getenv('WALLET_PRIVATE_KEY'))
     wallet_address = wallet.address
 
-    # Google Sheets - ROBUST: json.loads() with error handling
-    try:
-        creds_json_str = os.getenv('CREDENTIALS_JSON')
-        if not creds_json_str:
-            raise ValueError("CREDENTIALS_JSON not set")
-        creds_dict = json.loads(creds_json_str)
-        creds = Credentials.from_service_account_info(creds_dict)
-        sheets_service = build('sheets', 'v4', credentials=creds)
-        sheet_id = os.getenv('SHEET_ID')
-    except json.JSONDecodeError as e:
-        print(f"[JSON Error] Invalid CREDENTIALS_JSON: {e}. Check Railway Variables.")
+    # Google Sheets - BULLETPROOF: json.loads() with validation
+    creds_json_str = os.getenv('CREDENTIALS_JSON')
+    if not creds_json_str:
+        print("[Sheets] CREDENTIALS_JSON not set in Variables")
         creds = None
         sheets_service = None
         sheet_id = None
-    except Exception as e:
-        print(f"[Sheets Setup Error] {e}")
-        creds = None
-        sheets_service = None
-        sheet_id = None
+    else:
+        try:
+            creds_dict = json.loads(creds_json_str)
+            if not isinstance(creds_dict, dict) or 'client_email' not in creds_dict:
+                raise ValueError("Invalid JSON structure")
+            creds = Credentials.from_service_account_info(creds_dict)
+            sheets_service = build('sheets', 'v4', credentials=creds)
+            sheet_id = os.getenv('SHEET_ID')
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            print(f"[Sheets Setup Error] Invalid CREDENTIALS_JSON: {e}. Check Variables.")
+            creds = None
+            sheets_service = None
+            sheet_id = None
 
     # X/Twitter API v2 Setup
     auth = tweepy.OAuth1UserHandler(
@@ -137,7 +138,7 @@ def execute_defi():
 
 def log_to_sheets(data):
     if sheets_service is None:
-        print(f"[Sheets] Skipped: Setup failed")
+        print("[Sheets] Skipped: Setup failed")
         return
     try:
         sheets_service.spreadsheets().values().append(

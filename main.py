@@ -20,7 +20,6 @@ if 'streamlit' in os.sys.modules:
     pass
 else:
     # Main bot mode
-    # Load Exchanges
     exchanges = {
         'bybit': ccxt.bybit({
             'apiKey': os.getenv('BYBIT_KEY'),
@@ -39,7 +38,6 @@ else:
         })
     }
 
-    # Sandbox Mode Toggle
     if os.getenv('SANDBOX', 'True') == 'True':
         for ex in exchanges.values():
             try:
@@ -47,37 +45,32 @@ else:
             except Exception as e:
                 print(f"[!] Sandbox not supported: {ex.id}")
 
-    # Wallet + Web3
     infura_url = f"https://mainnet.infura.io/v3/{os.getenv('INFURA_KEY')}"
     w3 = Web3(Web3.HTTPProvider(infura_url))
     wallet = w3.eth.account.from_key(os.getenv('WALLET_PRIVATE_KEY'))
     wallet_address = wallet.address
 
-    # === GOOGLE SHEETS - BULLETPROOF PARSING (BOT MODE) ===
+    # === GOOGLE SHEETS (BOT MODE) ===
     creds_json_str = os.getenv('CREDENTIALS_JSON')
     if not creds_json_str:
-        print("[Sheets] CREDENTIALS_JSON not set in Variables")
+        print("[Sheets] CREDENTIALS_JSON not set")
         sheets_service = None
         sheet_id = None
     else:
         try:
-            # Strip outer quotes & whitespace
             creds_json_str = creds_json_str.strip().strip('"').strip("'")
             creds_dict = json.loads(creds_json_str)
-            if not isinstance(creds_dict, dict) or 'client_email' not in creds_dict:
-                raise ValueError("Invalid JSON structure")
+            if not isinstance(creds_dict, dict):
+                raise ValueError("Not a dict")
             creds = Credentials.from_service_account_info(creds_dict)
             sheets_service = build('sheets', 'v4', credentials=creds)
             sheet_id = os.getenv('SHEET_ID')
-            if not sheet_id:
-                print("[Sheets] SHEET_ID not set")
-                sheets_service = None
         except Exception as e:
-            print(f"[Sheets Setup Error] {e}")
+            print(f"[Sheets Error] {e}")
             sheets_service = None
             sheet_id = None
 
-    # X/Twitter API v2 Setup
+    # X/Twitter
     auth = tweepy.OAuth1UserHandler(
         os.getenv('X_CONSUMER_KEY'),
         os.getenv('X_CONSUMER_SECRET'),
@@ -126,7 +119,7 @@ def execute_arbitrage():
                     amount = min(balance * 0.01 / ask, 100)
                     ex.create_order(pair, 'limit', 'buy', amount, ask)
                     ex.create_order(pair, 'limit', 'sell', amount, bid)
-                    print(f"[Arbitrage] {pair}: executed {amount} units profit ${amount * (bid - ask):.2f}")
+                    print(f"[Arbitrage] {pair}: ${amount * (bid - ask):.2f}")
     except Exception:
         print(traceback.format_exc())
 
@@ -135,13 +128,12 @@ def execute_defi():
         if w3.is_connected():
             balance = w3.eth.get_balance(wallet_address) / 10**18
             if balance > 0.01:
-                print(f"[DeFi] Deposited {balance:.4f} ETH to Pendle/Aave simulation.")
+                print(f"[DeFi] {balance:.4f} ETH")
     except Exception:
         print(traceback.format_exc())
 
 def log_to_sheets(data):
-    if sheets_service is None or sheet_id is None:
-        print("[Sheets] Skipped: Setup failed")
+    if not sheets_service or not sheet_id:
         return
     try:
         sheets_service.spreadsheets().values().append(
@@ -154,22 +146,10 @@ def log_to_sheets(data):
     except Exception:
         print(traceback.format_exc())
 
-def send_whatsapp_alert(message):
-    try:
-        zapier_webhook = os.getenv('ZAPIER_WEBHOOK')
-        payload = {'value1': message}
-        res = requests.post(zapier_webhook, json=payload)
-        if res.status_code != 200:
-            print(f"[WhatsApp] Error | Status: {res.status_code} | Response: {res.text}")
-        else:
-            print(f"[WhatsApp] Sent | Status: {res.status_code}")
-    except Exception as e:
-        print(f"[WhatsApp Error] {e}")
-
 def post_to_x(message):
     try:
         x_api.update_status(message[:280])
-        print(f"[X/Twitter] Posted: {message}")
+        print(f"[X] Posted: {message[:50]}...")
     except Exception as e:
         print(f"[X Error] {e}")
 
@@ -178,86 +158,73 @@ def post_to_telegram(message):
         bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
         chat_id = os.getenv('TELEGRAM_CHAT_ID')
         if not bot_token or not chat_id:
-            print("[Telegram] Missing BOT_TOKEN or CHAT_ID")
             return
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        payload = {"chat_id": chat_id, "text": message[:4096]}
-        res = requests.post(url, json=payload)
+        res = requests.post(url, json={"chat_id": chat_id, "text": message[:4096]})
         if res.status_code != 200:
-            print(f"[Telegram] Error | Status: {res.status_code} | Response: {res.text}")
+            print(f"[Telegram] {res.status_code}: {res.text}")
         else:
-            print(f"[Telegram] Sent | Status: {res.status_code}")
+            print(f"[Telegram] Sent")
     except Exception as e:
         print(f"[Telegram Error] {e}")
 
 def auto_post_affiliate_links():
     try:
-        awin_links = fetch_deep_links('awin')
-        rakuten_links = fetch_deep_links('rakuten')
-        all_links = awin_links + rakuten_links
-        if not all_links:
-            print("No affiliate links found this cycle.")
+        links = fetch_deep_links('awin') + fetch_deep_links('rakuten')
+        if not links:
             return
-        links_to_post = random.sample(all_links, min(3, len(all_links)))
-        for link in links_to_post:
-            message = f"Latest deal! {link} #SlickofficialsHQ"
-            # send_to_zapier(message)  # Uncomment when Zapier is ready
-            post_to_x(message)
-            post_to_telegram(message)
-            log_to_sheets(f"Affiliate Posted: {link}")
-            print(f"[Affiliate] Posted link: {link}")
+        for link in random.sample(links, min(3, len(links))):
+            msg = f"Latest deal! {link} #SlickofficialsHQ"
+            post_to_x(msg)
+            post_to_telegram(msg)
+            log_to_sheets(f"Affiliate: {link}")
     except Exception as e:
-        print(f"[Affiliate AutoPost Error] {e}")
+        print(f"[Affiliate Error] {e}")
 
-# === DASHBOARD MODE (FIXED & SAFE) ===
+# === DASHBOARD MODE ===
 if 'streamlit' in os.sys.modules:
     st.title("OmniPredatorV4 Dashboard ©️ 2025 Slickofficials HQ by Amson Multi Global LTD")
     st.write("Resale rights included. Contact: slickofficials@amsonmultiglobal.com")
 
     try:
-        creds_json_str = os.getenv('CREDENTIALS_JSON')
-        if not creds_json_str:
-            st.error("CREDENTIALS_JSON not set in Railway Variables.")
+        creds_str = os.getenv('CREDENTIALS_JSON')
+        if not creds_str:
+            st.error("CREDENTIALS_JSON missing in Railway Variables.")
         else:
-            creds_json_str = creds_json_str.strip().strip('"').strip("'")
-            creds_dict = json.loads(creds_json_str)
+            creds_str = creds_str.strip().strip('"').strip("'")
+            creds_dict = json.loads(creds_str)
             creds = Credentials.from_service_account_info(creds_dict)
-            sheets_service = build('sheets', 'v4', credentials=creds)
+            service = build('sheets', 'v4', credentials=creds)
             sheet_id = os.getenv('SHEET_ID')
-
             if not sheet_id:
-                st.error("SHEET_ID not set in Variables.")
+                st.error("SHEET_ID missing.")
             else:
-                result = sheets_service.spreadsheets().values().get(
+                result = service.spreadsheets().values().get(
                     spreadsheetId=sheet_id, range="A:A"
                 ).execute()
-                data = result.get('values', [])
-
-                if data:
+                rows = result.get('values', [])
+                if rows:
                     st.write("### Recent Logs")
-                    for row in data[-10:]:
+                    for row in rows[-10:]:
                         st.write(row[0])
                 else:
-                    st.write("No data yet.")
+                    st.write("No logs yet.")
     except json.JSONDecodeError as e:
-        st.error(f"JSON Parse Error: {e}")
+        st.error(f"Invalid JSON in CREDENTIALS_JSON: {e}")
     except Exception as e:
-        st.error(f"Dashboard failed: {e}")
+        st.error(f"Dashboard error: {e}")
 
     if st.button("Refresh"):
-        st.experimental_rerun()
+        st.rerun()  # FIXED: st.rerun() instead of experimental_rerun
 
-# === MAIN LOOP (BOT MODE) ===
+# === MAIN LOOP ===
 if 'streamlit' not in os.sys.modules:
     def main():
         while True:
             try:
-                total_balance = sum(ex.fetch_balance()['total'].get('USDT', 0) for ex in exchanges.values())
+                bal = sum(ex.fetch_balance()['total'].get('USDT', 0) for ex in exchanges.values())
                 trades = sum(len(ex.fetch_open_orders()) for ex in exchanges.values())
-                forecast = total_balance * 0.1
-                data = f"${total_balance:.2f} | Trades: {trades} | Forecast: ${forecast:.2f}"
-                log_to_sheets(data)
-                send_whatsapp_alert(f"OmniPredatorV4-AffiliateApex | Amson Multi Global LTD: {data}")
+                log_to_sheets(f"${bal:.2f} | Trades: {trades}")
                 execute_arbitrage()
                 execute_defi()
                 auto_post_affiliate_links()
@@ -265,6 +232,5 @@ if 'streamlit' not in os.sys.modules:
             except Exception:
                 print(traceback.format_exc())
                 time.sleep(60)
-
     if __name__ == "__main__":
         main()

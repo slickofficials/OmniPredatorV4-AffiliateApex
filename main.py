@@ -53,7 +53,7 @@ else:
     wallet = w3.eth.account.from_key(os.getenv('WALLET_PRIVATE_KEY'))
     wallet_address = wallet.address
 
-    # Google Sheets - BULLETPROOF: json.loads() with validation
+    # Google Sheets - BULLETPROOF: Strip outer quotes before json.loads()
     creds_json_str = os.getenv('CREDENTIALS_JSON')
     if not creds_json_str:
         print("[Sheets] CREDENTIALS_JSON not set in Variables")
@@ -61,6 +61,8 @@ else:
         sheets_service = None
         sheet_id = None
     else:
+        # Strip outer quotes and whitespace
+        creds_json_str = creds_json_str.strip().strip('"').strip("'")
         try:
             creds_dict = json.loads(creds_json_str)
             if not isinstance(creds_dict, dict) or 'client_email' not in creds_dict:

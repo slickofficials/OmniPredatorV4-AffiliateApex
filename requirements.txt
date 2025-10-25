@@ -1,15 +1,8 @@
-ccxt
-pandas
-numpy
-scikit-learn
-web3
-requests
-gspread
-oauth2client
-vaderSentiment
 streamlit
-statsmodels
-tweepy
+ccxt
+google-auth
 google-api-python-client
+web3
+tweepy
 python-dotenv
-plotly  # Add this line
+requests

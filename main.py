@@ -53,10 +53,25 @@ else:
     wallet = w3.eth.account.from_key(os.getenv('WALLET_PRIVATE_KEY'))
     wallet_address = wallet.address
 
-    # Google Sheets - FIXED: Use json.loads() instead of eval()
-    creds = Credentials.from_service_account_info(json.loads(os.getenv('CREDENTIALS_JSON')))
-    sheets_service = build('sheets', 'v4', credentials=creds)
-    sheet_id = os.getenv('SHEET_ID')
+    # Google Sheets - ROBUST: json.loads() with error handling
+    try:
+        creds_json_str = os.getenv('CREDENTIALS_JSON')
+        if not creds_json_str:
+            raise ValueError("CREDENTIALS_JSON not set")
+        creds_dict = json.loads(creds_json_str)
+        creds = Credentials.from_service_account_info(creds_dict)
+        sheets_service = build('sheets', 'v4', credentials=creds)
+        sheet_id = os.getenv('SHEET_ID')
+    except json.JSONDecodeError as e:
+        print(f"[JSON Error] Invalid CREDENTIALS_JSON: {e}. Check Railway Variables.")
+        creds = None
+        sheets_service = None
+        sheet_id = None
+    except Exception as e:
+        print(f"[Sheets Setup Error] {e}")
+        creds = None
+        sheets_service = None
+        sheet_id = None
 
     # X/Twitter API v2 Setup
     auth = tweepy.OAuth1UserHandler(
@@ -121,6 +136,9 @@ def execute_defi():
         print(traceback.format_exc())
 
 def log_to_sheets(data):
+    if sheets_service is None:
+        print(f"[Sheets] Skipped: Setup failed")
+        return
     try:
         sheets_service.spreadsheets().values().append(
             spreadsheetId=sheet_id,

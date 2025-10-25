@@ -53,26 +53,27 @@ else:
     wallet = w3.eth.account.from_key(os.getenv('WALLET_PRIVATE_KEY'))
     wallet_address = wallet.address
 
-    # Google Sheets - BULLETPROOF: Strip outer quotes before json.loads()
+    # === GOOGLE SHEETS - BULLETPROOF PARSING (BOT MODE) ===
     creds_json_str = os.getenv('CREDENTIALS_JSON')
     if not creds_json_str:
         print("[Sheets] CREDENTIALS_JSON not set in Variables")
-        creds = None
         sheets_service = None
         sheet_id = None
     else:
-        # Strip outer quotes and whitespace
-        creds_json_str = creds_json_str.strip().strip('"').strip("'")
         try:
+            # Strip outer quotes & whitespace
+            creds_json_str = creds_json_str.strip().strip('"').strip("'")
             creds_dict = json.loads(creds_json_str)
             if not isinstance(creds_dict, dict) or 'client_email' not in creds_dict:
                 raise ValueError("Invalid JSON structure")
             creds = Credentials.from_service_account_info(creds_dict)
             sheets_service = build('sheets', 'v4', credentials=creds)
             sheet_id = os.getenv('SHEET_ID')
-        except (json.JSONDecodeError, ValueError, KeyError) as e:
-            print(f"[Sheets Setup Error] Invalid CREDENTIALS_JSON: {e}. Check Variables.")
-            creds = None
+            if not sheet_id:
+                print("[Sheets] SHEET_ID not set")
+                sheets_service = None
+        except Exception as e:
+            print(f"[Sheets Setup Error] {e}")
             sheets_service = None
             sheet_id = None
 
@@ -139,7 +140,7 @@ def execute_defi():
         print(traceback.format_exc())
 
 def log_to_sheets(data):
-    if sheets_service is None:
+    if sheets_service is None or sheet_id is None:
         print("[Sheets] Skipped: Setup failed")
         return
     try:
@@ -176,6 +177,9 @@ def post_to_telegram(message):
     try:
         bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
         chat_id = os.getenv('TELEGRAM_CHAT_ID')
+        if not bot_token or not chat_id:
+            print("[Telegram] Missing BOT_TOKEN or CHAT_ID")
+            return
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         payload = {"chat_id": chat_id, "text": message[:4096]}
         res = requests.post(url, json=payload)
@@ -196,37 +200,54 @@ def auto_post_affiliate_links():
             return
         links_to_post = random.sample(all_links, min(3, len(all_links)))
         for link in links_to_post:
-            message = f"🔥 Latest deal! {link} 💰 #SlickofficialsHQ"
-            send_to_zapier(message)  # Posts to FB, IG, Telegram, WhatsApp, TikTok via Zapier
-            post_to_x(message)  # Direct X posting
+            message = f"Latest deal! {link} #SlickofficialsHQ"
+            # send_to_zapier(message)  # Uncomment when Zapier is ready
+            post_to_x(message)
+            post_to_telegram(message)
             log_to_sheets(f"Affiliate Posted: {link}")
             print(f"[Affiliate] Posted link: {link}")
     except Exception as e:
         print(f"[Affiliate AutoPost Error] {e}")
 
-# === DASHBOARD MODE ===
+# === DASHBOARD MODE (FIXED & SAFE) ===
 if 'streamlit' in os.sys.modules:
-    st.title("OmniPredatorV4 Dashboard © 2025 Slickofficials HQ by Amson Multi Global LTD")
+    st.title("OmniPredatorV4 Dashboard ©️ 2025 Slickofficials HQ by Amson Multi Global LTD")
     st.write("Resale rights included. Contact: slickofficials@amsonmultiglobal.com")
 
-    creds = Credentials.from_service_account_info(json.loads(os.getenv('CREDENTIALS_JSON')))  # FIXED: json.loads()
-    sheets_service = build('sheets', 'v4', credentials=creds)
-    sheet_id = os.getenv('SHEET_ID')
+    try:
+        creds_json_str = os.getenv('CREDENTIALS_JSON')
+        if not creds_json_str:
+            st.error("CREDENTIALS_JSON not set in Railway Variables.")
+        else:
+            creds_json_str = creds_json_str.strip().strip('"').strip("'")
+            creds_dict = json.loads(creds_json_str)
+            creds = Credentials.from_service_account_info(creds_dict)
+            sheets_service = build('sheets', 'v4', credentials=creds)
+            sheet_id = os.getenv('SHEET_ID')
 
-    sheet = sheets_service.spreadsheets().values().get(spreadsheetId=sheet_id, range="A:A").execute()
-    data = sheet.get('values', [])
+            if not sheet_id:
+                st.error("SHEET_ID not set in Variables.")
+            else:
+                result = sheets_service.spreadsheets().values().get(
+                    spreadsheetId=sheet_id, range="A:A"
+                ).execute()
+                data = result.get('values', [])
 
-    if data:
-        st.write("### Recent Logs")
-        for row in data[-10:]:
-            st.write(row[0])
-    else:
-        st.write("No data yet.")
+                if data:
+                    st.write("### Recent Logs")
+                    for row in data[-10:]:
+                        st.write(row[0])
+                else:
+                    st.write("No data yet.")
+    except json.JSONDecodeError as e:
+        st.error(f"JSON Parse Error: {e}")
+    except Exception as e:
+        st.error(f"Dashboard failed: {e}")
 
     if st.button("Refresh"):
         st.experimental_rerun()
 
-# === MAIN LOOP ===
+# === MAIN LOOP (BOT MODE) ===
 if 'streamlit' not in os.sys.modules:
     def main():
         while True:
